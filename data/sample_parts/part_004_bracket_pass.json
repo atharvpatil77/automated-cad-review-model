@@ -1,0 +1,13 @@
+{
+  "part_id": "BRK-004",
+  "part_name": "Control Box Mount",
+  "part_category": "sheet_metal_bracket",
+  "material": "Stainless Steel 304",
+  "wall_thickness_mm": 2.6,
+  "bounding_box_mm": [180, 140, 90],
+  "min_fillet_radius_mm": 1.0,
+  "features": [
+    {"type": "mounting_hole", "diameter_mm": 8.0, "hole_diameter_tolerance_mm": 0.1, "position": [40, 40]},
+    {"type": "mounting_hole", "diameter_mm": 8.0, "hole_diameter_tolerance_mm": 0.09, "position": [140, 40]}
+  ]
+}

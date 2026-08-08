@@ -1,0 +1,13 @@
+{
+  "part_id": "BRK-001",
+  "part_name": "Motor Mount Bracket",
+  "part_category": "sheet_metal_bracket",
+  "material": "Aluminum 6061",
+  "wall_thickness_mm": 3.0,
+  "bounding_box_mm": [120, 80, 40],
+  "min_fillet_radius_mm": 1.5,
+  "features": [
+    {"type": "mounting_hole", "diameter_mm": 6.0, "hole_diameter_tolerance_mm": 0.05, "position": [20, 20]},
+    {"type": "mounting_hole", "diameter_mm": 6.0, "hole_diameter_tolerance_mm": 0.08, "position": [100, 20]}
+  ]
+}

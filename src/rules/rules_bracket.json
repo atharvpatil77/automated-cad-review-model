@@ -1,0 +1,51 @@
+{
+  "part_category": "sheet_metal_bracket",
+  "spec_source": "data/sample_specs/bracket_requirements.md",
+  "rules": [
+    {
+      "id": "R001",
+      "description": "Minimum wall thickness for aluminum brackets",
+      "applies_to": {"material": "Aluminum 6061"},
+      "feature": "wall_thickness_mm",
+      "check": "min",
+      "value": 2.5,
+      "severity": "critical"
+    },
+    {
+      "id": "R002",
+      "description": "Mounting hole diameter tolerance",
+      "applies_to": {"feature_type": "mounting_hole"},
+      "feature": "hole_diameter_tolerance_mm",
+      "check": "max",
+      "value": 0.1,
+      "severity": "critical"
+    },
+    {
+      "id": "R003",
+      "description": "Material must match approved spec list",
+      "applies_to": {},
+      "feature": "material",
+      "check": "in_set",
+      "value": ["Aluminum 6061", "Aluminum 5052", "Stainless Steel 304"],
+      "severity": "critical"
+    },
+    {
+      "id": "R004",
+      "description": "Overall envelope must not exceed max bounding box",
+      "applies_to": {},
+      "feature": "bounding_box_mm",
+      "check": "bbox_max",
+      "value": [200, 150, 100],
+      "severity": "major"
+    },
+    {
+      "id": "R005",
+      "description": "Minimum internal fillet/edge radius to avoid stress concentration",
+      "applies_to": {},
+      "feature": "min_fillet_radius_mm",
+      "check": "min",
+      "value": 1.0,
+      "severity": "major"
+    }
+  ]
+}
