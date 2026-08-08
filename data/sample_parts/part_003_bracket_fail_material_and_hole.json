@@ -1,0 +1,12 @@
+{
+  "part_id": "BRK-003",
+  "part_name": "Bracket Camera Housing",
+  "part_category": "sheet_metal_bracket",
+  "material": "Mild Steel",
+  "wall_thickness_mm": 3.2,
+  "bounding_box_mm": [150, 100, 60],
+  "min_fillet_radius_mm": 0.5,
+  "features": [
+    {"type": "mounting_hole", "diameter_mm": 5.0, "hole_diameter_tolerance_mm": 0.15, "position": [30, 30]}
+  ]
+}
