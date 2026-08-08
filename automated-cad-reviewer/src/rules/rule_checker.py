@@ -1,21 +1,37 @@
 """
 Deterministic compliance checker.
 
-Takes structured CAD feature data (as produced by src/extraction/cad_extractor.py,
-or in the MVP, hand-authored JSON standing in for it) and a set of requirement
-rules (as produced by the RAG layer, or in the MVP, hand-authored JSON standing
-in for it), and returns a pass/fail verdict with reasons.
+Takes structured CAD feature data (as produced by src/extraction/cad_extractor.py)
+and a set of requirement rules (as produced by the RAG layer, or currently
+hand-authored JSON standing in for it), and returns a pass/fail/manual-review
+verdict per rule with reasons.
 
 Design intent: this module must NEVER call an LLM. Numeric/logical compliance
 checks should be auditable and deterministic. The agentic/LLM layer sits on
 top of this and explains results in natural language -- it does not replace
 this logic.
+
+Three-state result, not just pass/fail:
+- PASS / FAIL: the required feature was extracted and the check ran.
+- MANUAL_REVIEW: the required feature is not present in the extracted data
+  at all (e.g. hole tolerance, which geometry alone cannot provide -- it
+  lives in drawing PMI/manufacturing specs, not the nominal 3D model).
+  This is NOT the same as a failure -- it means "this system cannot verify
+  this requirement automatically," which must be surfaced honestly rather
+  than silently reported as either a pass or a fail.
 """
 from __future__ import annotations
 import json
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any
+
+
+class Status(str, Enum):
+    PASS = "PASS"
+    FAIL = "FAIL"
+    MANUAL_REVIEW = "MANUAL_REVIEW"
 
 
 @dataclass
@@ -23,8 +39,13 @@ class CheckResult:
     rule_id: str
     description: str
     severity: str
-    passed: bool
+    status: Status
     detail: str
+
+    @property
+    def passed(self) -> bool:
+        """Kept for backward compatibility with report_generator.py."""
+        return self.status == Status.PASS
 
 
 @dataclass
@@ -35,11 +56,15 @@ class PartReport:
 
     @property
     def passed(self) -> bool:
-        return all(r.passed for r in self.results)
+        return all(r.status != Status.FAIL for r in self.results)
 
     @property
     def critical_failures(self) -> list[CheckResult]:
-        return [r for r in self.results if not r.passed and r.severity == "critical"]
+        return [r for r in self.results if r.status == Status.FAIL and r.severity == "critical"]
+
+    @property
+    def needs_manual_review(self) -> list[CheckResult]:
+        return [r for r in self.results if r.status == Status.MANUAL_REVIEW]
 
 
 def _feature_applies(rule: dict, part: dict) -> bool:
@@ -49,7 +74,6 @@ def _feature_applies(rule: dict, part: dict) -> bool:
         if key == "material" and part.get("material") != expected:
             return False
         if key == "feature_type":
-            # handled per-feature in _run_feature_level_rule instead
             continue
     return True
 
@@ -61,31 +85,40 @@ def _run_part_level_rule(rule: dict, part: dict) -> CheckResult:
     if not _feature_applies(rule, part):
         return CheckResult(
             rule_id=rule["id"], description=rule["description"],
-            severity=rule["severity"], passed=True,
+            severity=rule["severity"], status=Status.PASS,
             detail="Not applicable to this part's material/category."
         )
 
     actual = part.get(feature_key)
 
+    if actual is None:
+        return CheckResult(
+            rule_id=rule["id"], description=rule["description"],
+            severity=rule["severity"], status=Status.MANUAL_REVIEW,
+            detail=f"{feature_key} not available from extracted geometry -- "
+                   f"requires manual review (e.g. drawing/PMI data)."
+        )
+
     if check == "min":
-        passed = actual is not None and actual >= rule["value"]
+        status = Status.PASS if actual >= rule["value"] else Status.FAIL
         detail = f"{feature_key} = {actual} (required minimum {rule['value']})"
     elif check == "max":
-        passed = actual is not None and actual <= rule["value"]
+        status = Status.PASS if actual <= rule["value"] else Status.FAIL
         detail = f"{feature_key} = {actual} (required maximum {rule['value']})"
     elif check == "in_set":
-        passed = actual in rule["value"]
+        status = Status.PASS if actual in rule["value"] else Status.FAIL
         detail = f"{feature_key} = '{actual}' (approved set: {rule['value']})"
     elif check == "bbox_max":
         limits = rule["value"]
-        passed = all(dim <= lim for dim, lim in zip(actual, limits))
+        ok = all(dim <= lim for dim, lim in zip(actual, limits))
+        status = Status.PASS if ok else Status.FAIL
         detail = f"bounding_box = {actual} (max allowed {limits})"
     else:
         raise ValueError(f"Unknown check type: {check}")
 
     return CheckResult(
         rule_id=rule["id"], description=rule["description"],
-        severity=rule["severity"], passed=passed, detail=detail
+        severity=rule["severity"], status=status, detail=detail
     )
 
 
@@ -98,7 +131,7 @@ def _run_feature_level_rule(rule: dict, part: dict) -> list[CheckResult]:
     if not matching_features:
         results.append(CheckResult(
             rule_id=rule["id"], description=rule["description"],
-            severity=rule["severity"], passed=True,
+            severity=rule["severity"], status=Status.PASS,
             detail=f"No '{target_type}' features present on this part."
         ))
         return results
@@ -107,16 +140,26 @@ def _run_feature_level_rule(rule: dict, part: dict) -> list[CheckResult]:
     check = rule["check"]
     for i, feat in enumerate(matching_features):
         actual = feat.get(feature_key)
+
+        if actual is None:
+            results.append(CheckResult(
+                rule_id=rule["id"], description=rule["description"],
+                severity=rule["severity"], status=Status.MANUAL_REVIEW,
+                detail=f"{target_type} #{i+1}: {feature_key} not available from "
+                       f"extracted geometry -- requires manual review."
+            ))
+            continue
+
         if check == "max":
-            passed = actual is not None and actual <= rule["value"]
+            status = Status.PASS if actual <= rule["value"] else Status.FAIL
         elif check == "min":
-            passed = actual is not None and actual >= rule["value"]
+            status = Status.PASS if actual >= rule["value"] else Status.FAIL
         else:
             raise ValueError(f"Unknown feature-level check type: {check}")
         detail = f"{target_type} #{i+1}: {feature_key} = {actual} (limit {rule['value']})"
         results.append(CheckResult(
             rule_id=rule["id"], description=rule["description"],
-            severity=rule["severity"], passed=passed, detail=detail
+            severity=rule["severity"], status=status, detail=detail
         ))
     return results
 
