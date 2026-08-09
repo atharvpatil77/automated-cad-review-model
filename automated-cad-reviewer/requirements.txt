@@ -1,15 +1,16 @@
-# Phase 1: MVP (deterministic checker) -- no extra deps beyond stdlib
+# Phase 1: real CAD extraction
+cadquery>=2.4
 
-# Phase 1: real CAD extraction (uncomment once you start on cad_extractor.py)
-# cadquery>=2.4
+# Phase 3/4: LLM explanation layer (Gemini)
+google-genai>=0.3
 
-# Phase 3: RAG layer
+# Phase 3: RAG layer (not yet wired in)
 # chromadb>=0.5
 # sentence-transformers>=3.0
 # pypdf>=4.0
 
-# Phase 3/4: agentic layer
-# anthropic>=0.34
+# Website (Streamlit)
+streamlit>=1.35
 
 # testing
 pytest>=8.0
